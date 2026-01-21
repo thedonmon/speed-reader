@@ -1,5 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extract } from '@extractus/article-extractor';
+import { convert } from '@kreuzberg/html-to-markdown-wasm';
+
+// Common browser user agent to avoid bot detection
+const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+// Request timeout in milliseconds
+const REQUEST_TIMEOUT = 15000;
+
+/**
+ * Convert HTML to Markdown using kreuzberg's high-performance converter
+ * Handles tables, code blocks, strikethrough, and more out of the box
+ */
+function htmlToMarkdown(html: string): string {
+  return convert(html, {
+    headingStyle: 'atx',  // Use # style headings
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,30 +29,60 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let fetchUrl = url;
+
+    // Convert GitHub blob URLs to raw URLs
+    // e.g., github.com/user/repo/blob/branch/path/file.md -> raw.githubusercontent.com/user/repo/branch/path/file.md
+    const githubBlobMatch = url.match(/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+)/);
+    if (githubBlobMatch) {
+      const [, user, repo, rest] = githubBlobMatch;
+      fetchUrl = `https://raw.githubusercontent.com/${user}/${repo}/${rest}`;
+    }
+
     // Check if it's a raw content URL (github raw, gist, etc.)
     const isRawUrl = 
-      url.includes('raw.githubusercontent.com') ||
-      url.includes('gist.githubusercontent.com') ||
-      url.endsWith('.md') ||
-      url.endsWith('.txt');
+      fetchUrl.includes('raw.githubusercontent.com') ||
+      fetchUrl.includes('gist.githubusercontent.com') ||
+      fetchUrl.endsWith('.md') ||
+      fetchUrl.endsWith('.txt');
 
     if (isRawUrl) {
-      // Fetch raw content directly
-      const response = await fetch(url);
+      // Fetch raw content directly with timeout
+      const response = await fetch(fetchUrl, {
+        headers: { 'User-Agent': USER_AGENT },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT),
+      });
       if (!response.ok) {
         throw new Error(`Failed to fetch: ${response.statusText}`);
       }
-      const content = await response.text();
+      let content = await response.text();
+      
+      // If content looks like HTML (not markdown), convert to markdown
+      const looksLikeHtml = content.trim().startsWith('<!') || 
+                           content.trim().startsWith('<html') ||
+                           (content.includes('</div>') && !content.includes('```'));
+      
+      if (looksLikeHtml) {
+        // Convert HTML to Markdown (handles script/style removal internally)
+        content = htmlToMarkdown(content);
+      }
       
       return NextResponse.json({
-        title: url.split('/').pop() || 'Document',
+        title: fetchUrl.split('/').pop() || 'Document',
         content,
         source: url,
       });
     }
 
-    // Use article extractor for web pages
-    const article = await extract(url);
+    // Use article extractor for web pages with custom headers and timeout
+    const article = await extract(fetchUrl, {}, {
+      headers: {
+        'User-Agent': USER_AGENT,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+      },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT),
+    });
 
     if (!article) {
       return NextResponse.json(
@@ -44,26 +91,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Clean up the content - remove HTML tags for plain text
-    let content = article.content || '';
-    
-    // Basic HTML stripping (the extractor returns HTML)
-    content = content
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/\s+/g, ' ')
-      .trim();
+    // Convert HTML content to Markdown (preserves headings, links, code blocks, tables, etc.)
+    let content = htmlToMarkdown(article.content || '');
 
-    // Prepend title if available
+    // Prepend title as H1 if available
     if (article.title) {
-      content = `${article.title}\n\n${content}`;
+      content = `# ${article.title}\n\n${content}`;
     }
 
     return NextResponse.json({

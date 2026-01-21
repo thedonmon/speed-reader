@@ -11,6 +11,9 @@ importers:
       '@extractus/article-extractor':
         specifier: ^8.0.20
         version: 8.0.20
+      '@kreuzberg/html-to-markdown-wasm':
+        specifier: ^2.23.4
+        version: 2.23.4
       '@lingo-reader/epub-parser':
         specifier: ^0.4.5
         version: 0.4.5
@@ -422,6 +425,9 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@kreuzberg/html-to-markdown-wasm@2.23.4':
+    resolution: {integrity: sha512-neR/r8KubxSpp/oqt59jEWdK6zQcJcXf5Xlq707ik0ovNuILcY9A55VgfuuREt7UnbCh/5FSVTm1SvLBhGu4bw==}
 
   '@lingo-reader/epub-parser@0.4.5':
     resolution: {integrity: sha512-R5rbKVZrgZ2JtOblT+CTJOpo+yRTG9cZHHo0cOCYgH6eNbcTFUCIn6RYKTQ+LdcCXFRH0IEnNZGLZ9DndgARRQ==}
@@ -3448,6 +3454,8 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@kreuzberg/html-to-markdown-wasm@2.23.4': {}
 
   '@lingo-reader/epub-parser@0.4.5':
     dependencies:

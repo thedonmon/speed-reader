@@ -65,7 +65,14 @@ export function InputPanel({ className }: InputPanelProps) {
       const data = await response.json();
       
       if (data.content) {
-        loadText(data.content, data.title);
+        // Check if content is markdown and parse it appropriately
+        if (isMarkdown(data.content)) {
+          const parsed = parseMarkdown(data.content);
+          parsed.title = parsed.title || data.title;
+          loadContent(parsed);
+        } else {
+          loadText(data.content, data.title);
+        }
       } else {
         throw new Error('No content found');
       }
