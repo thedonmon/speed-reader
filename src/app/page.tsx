@@ -1,65 +1,315 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Settings, ChevronLeft, Zap, Maximize2, Minimize2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { WordDisplay } from '@/components/reader/WordDisplay';
+import { Controls } from '@/components/reader/Controls';
+import { FocusedControls } from '@/components/reader/FocusedControls';
+import { PlaybackEngine } from '@/components/reader/PlaybackEngine';
+import { SettingsPanel } from '@/components/reader/SettingsPanel';
+import { InputPanel } from '@/components/reader/InputPanel';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { useReaderStore } from '@/stores/reader-store';
+import { useTouchGestures } from '@/hooks/useTouchGestures';
+import { cn } from '@/lib/utils';
 
 export default function Home() {
+  const [showSettings, setShowSettings] = useState(false);
+  const [focusedMode, setFocusedMode] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const { state, slides, settings, clear, currentSlide, play, pause, next, previous, setWPM } = useReaderStore();
+  const focusedContainerRef = useRef<HTMLDivElement>(null);
+  
+  const hasContent = slides.length > 0;
+  const isReading = state === 'playing' || state === 'paused' || state === 'ready' || state === 'finished';
+  const isPlaying = state === 'playing';
+
+  // Auto-hide controls in focused mode when playing
+  useEffect(() => {
+    if (!focusedMode || !isPlaying) {
+      setControlsVisible(true);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setControlsVisible(false);
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [focusedMode, isPlaying, controlsVisible]);
+
+  // Show controls on mouse/touch movement in focused mode
+  const handleInteraction = useCallback(() => {
+    if (focusedMode) {
+      setControlsVisible(true);
+    }
+  }, [focusedMode]);
+
+  // Handle tap to play/pause in focused mode
+  const handleDisplayTap = useCallback(() => {
+    if (isPlaying) {
+      pause();
+    } else {
+      play();
+    }
+    setControlsVisible(true);
+  }, [isPlaying, play, pause]);
+
+  // Touch gestures for focused mode
+  const { bindGestures } = useTouchGestures({
+    onSwipeLeft: () => { next(); setControlsVisible(true); },
+    onSwipeRight: () => { previous(); setControlsVisible(true); },
+    onSwipeUp: () => { setWPM(Math.min(settings.wpm + 50, 1500)); setControlsVisible(true); },
+    onSwipeDown: () => { setWPM(Math.max(settings.wpm - 50, 50)); setControlsVisible(true); },
+    onTap: handleDisplayTap,
+  });
+
+  // Bind touch gestures to focused container
+  useEffect(() => {
+    if (focusedMode && focusedContainerRef.current) {
+      return bindGestures(focusedContainerRef.current);
+    }
+  }, [focusedMode, bindGestures]);
+
+  // Exit focused mode with Escape
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && focusedMode) {
+        setFocusedMode(false);
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [focusedMode]);
+
+  // Focused reading mode - full screen minimal UI
+  if (focusedMode && hasContent) {
+    return (
+      <div 
+        ref={focusedContainerRef}
+        className="fixed inset-0 bg-background z-50 flex flex-col touch-manipulation select-none"
+        onMouseMove={handleInteraction}
+      >
+        <PlaybackEngine />
+        
+        {/* Minimal header - auto-hides */}
+        <header className={cn(
+          "absolute top-0 left-0 right-0 z-10 transition-opacity duration-300",
+          controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}>
+          <div className="flex items-center justify-between p-4">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setFocusedMode(false)}
+            >
+              <Minimize2 className="h-4 w-4 mr-2" />
+              Exit
+            </Button>
+            <ThemeToggle />
+          </div>
+        </header>
+
+        {/* Word display - gestures handled by useTouchGestures */}
+        <div className="flex-1 flex items-center justify-center">
+          <WordDisplay 
+            slide={currentSlide()} 
+            settings={settings}
+            className="w-full h-full px-4 md:px-8"
+            compact
+          />
+        </div>
+
+        {/* Focused controls - auto-hides */}
+        <div className={cn(
+          "absolute bottom-0 left-0 right-0 z-10 transition-opacity duration-300",
+          controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}>
+          <FocusedControls />
+        </div>
+
+        {/* Gesture hints - shown briefly */}
+        {controlsVisible && (
+          <div className="absolute top-1/2 left-4 right-4 -translate-y-1/2 pointer-events-none flex justify-between text-muted-foreground/30 text-xs">
+            <span className="hidden sm:block">Swipe right: Previous</span>
+            <span className="hidden sm:block">Swipe left: Next</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="min-h-screen bg-background">
+      {/* Playback engine (invisible) */}
+      <PlaybackEngine />
+
+      {/* Header */}
+      <header className="border-b">
+        <div className="container mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Zap className="h-6 w-6 text-primary" />
+            <h1 className="text-xl font-bold">Speed Reader</h1>
+          </div>
+          
+          <div className="flex items-center gap-1">
+            {hasContent && (
+              <>
+                <Button variant="ghost" size="sm" onClick={clear}>
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  New
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => setFocusedMode(true)}
+                  title="Focused reading mode"
+                >
+                  <Maximize2 className="h-5 w-5" />
+                </Button>
+              </>
+            )}
+            <ThemeToggle />
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => setShowSettings(!showSettings)}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              <Settings className={cn('h-5 w-5', showSettings && 'text-primary')} />
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      <main className="container mx-auto px-4 py-6">
+        <div className="flex gap-6">
+          {/* Main content area */}
+          <div className={cn('flex-1 space-y-6', showSettings && 'lg:max-w-[calc(100%-320px)]')}>
+            {!hasContent ? (
+              /* Input mode */
+              <Card>
+                <CardHeader>
+                  <CardTitle>Load Content</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <InputPanel />
+                </CardContent>
+              </Card>
+            ) : (
+              /* Reading mode */
+              <>
+                {/* Word display area */}
+                <Card className="overflow-hidden touch-manipulation">
+                  <CardContent className="p-0">
+                    <div 
+                      className="h-48 sm:h-64 md:h-80 lg:h-96 bg-card flex items-center justify-center"
+                      style={{ 
+                        backgroundColor: state === 'playing' ? 'hsl(var(--card))' : undefined 
+                      }}
+                    >
+                      <WordDisplay 
+                        slide={currentSlide()} 
+                        settings={settings}
+                        className="w-full h-full px-4 sm:px-8"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Controls */}
+                <Card>
+                  <CardContent className="pt-4 sm:pt-6">
+                    <Controls />
+                  </CardContent>
+                </Card>
+
+                {/* Mobile: Quick access to focused mode */}
+                <div className="sm:hidden">
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => setFocusedMode(true)}
+                  >
+                    <Maximize2 className="h-4 w-4 mr-2" />
+                    Focused Reading Mode
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {/* Quick tips */}
+            {!hasContent && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">How it works</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm text-muted-foreground">
+                  <p>
+                    <strong>RSVP (Rapid Serial Visual Presentation)</strong> displays words 
+                    one at a time at a fixed point, eliminating eye movement and enabling 
+                    faster reading.
+                  </p>
+                  <p>
+                    The <strong>Optimal Recognition Point (ORP)</strong> is highlighted to 
+                    help your brain process each word more efficiently.
+                  </p>
+                  <p>
+                    Try the <strong>Word Frequency</strong> algorithm for smarter timing - 
+                    common words flash quickly while rare words are shown longer.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Settings sidebar */}
+          {showSettings && (
+            <aside className="hidden lg:block w-80 shrink-0">
+              <Card className="sticky top-6">
+                <CardHeader>
+                  <CardTitle>Settings</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <SettingsPanel />
+                </CardContent>
+              </Card>
+            </aside>
+          )}
         </div>
+
+        {/* Mobile settings (bottom sheet style) */}
+        {showSettings && (
+          <div className="lg:hidden fixed inset-x-0 bottom-0 z-50">
+            <Card className="rounded-t-xl rounded-b-none max-h-[70vh] overflow-y-auto">
+              <CardHeader className="sticky top-0 bg-card z-10 border-b">
+                <div className="flex items-center justify-between">
+                  <CardTitle>Settings</CardTitle>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setShowSettings(false)}
+                  >
+                    Done
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pb-8">
+                <SettingsPanel />
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </main>
+
+      {/* Footer */}
+      <footer className="border-t mt-auto">
+        <div className="container mx-auto px-4 py-4 text-center text-sm text-muted-foreground">
+          Speed Reader - Built with Next.js. 
+          Inspired by <a href="https://github.com/anthonynosek/sprint-reader-chrome" className="underline hover:text-foreground">Sprint Reader</a>.
+        </div>
+      </footer>
     </div>
   );
 }
