@@ -14,6 +14,12 @@ importers:
       '@lingo-reader/epub-parser':
         specifier: ^0.4.5
         version: 0.4.5
+      '@lingo-reader/fb2-parser':
+        specifier: ^0.4.5
+        version: 0.4.5
+      '@lingo-reader/mobi-parser':
+        specifier: ^0.4.5
+        version: 0.4.5
       '@lingo-reader/shared':
         specifier: ^0.4.5
         version: 0.4.5
@@ -419,6 +425,12 @@ packages:
 
   '@lingo-reader/epub-parser@0.4.5':
     resolution: {integrity: sha512-R5rbKVZrgZ2JtOblT+CTJOpo+yRTG9cZHHo0cOCYgH6eNbcTFUCIn6RYKTQ+LdcCXFRH0IEnNZGLZ9DndgARRQ==}
+
+  '@lingo-reader/fb2-parser@0.4.5':
+    resolution: {integrity: sha512-FLjgi7dtU901k/yOqmxOIfGXiAlk1K6dUNOMRg3FL/cGm38HPMsYdbbwLHhBekG4ZJOjEwZJj9BuMkTUF8KH5Q==}
+
+  '@lingo-reader/mobi-parser@0.4.5':
+    resolution: {integrity: sha512-VkievaXsb2CuOQpr/JVGKnMVkW4KQO3z70rd21AV0bZukfjqhxQ1EWNonc8fxOuhz2UfOZjW1d5xSgmRb+GKsg==}
 
   '@lingo-reader/shared@0.4.5':
     resolution: {integrity: sha512-ZGiMaWC+V3NwzNVlgW8bVmlspbGC4WHoFU2x44UH3jM3ax7OLjHUJ6iJ2XBtrInO93UbR0tsysFeUmTnzTJTCw==}
@@ -3442,6 +3454,15 @@ snapshots:
       '@lingo-reader/shared': 0.4.5
       fflate: 0.8.2
       jszip: 3.10.1
+
+  '@lingo-reader/fb2-parser@0.4.5':
+    dependencies:
+      '@lingo-reader/shared': 0.4.5
+
+  '@lingo-reader/mobi-parser@0.4.5':
+    dependencies:
+      '@lingo-reader/shared': 0.4.5
+      fflate: 0.8.2
 
   '@lingo-reader/shared@0.4.5':
     dependencies:

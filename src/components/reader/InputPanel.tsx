@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useReaderStore } from '@/stores/reader-store';
 import { cn } from '@/lib/utils';
-import { extractEpubText } from '@/lib/parsers/epub';
+import { extractEbookText, isEbookFile } from '@/lib/parsers/ebook';
 import { parseMarkdown, isMarkdown } from '@/lib/parsers/markdown';
 
 interface InputPanelProps {
@@ -87,13 +87,13 @@ export function InputPanel({ className }: InputPanelProps) {
       const extension = file.name.split('.').pop()?.toLowerCase();
       const fileName = file.name.replace(/\.[^/.]+$/, ''); // Remove extension
 
-      if (extension === 'epub') {
-        // Handle EPUB files using client-side parser
-        const text = await extractEpubText(file);
+      if (isEbookFile(file)) {
+        // Handle ebook files (EPUB, MOBI, AZW3, FB2) using client-side parser
+        const text = await extractEbookText(file);
         if (text) {
           loadText(text, fileName);
         } else {
-          throw new Error('Could not extract text from EPUB');
+          throw new Error('Could not extract text from ebook');
         }
       } else if (extension === 'md') {
         // Handle markdown files - parse for code blocks, tables, etc.
@@ -108,7 +108,7 @@ export function InputPanel({ className }: InputPanelProps) {
         setInputText(text);
         loadText(text, fileName);
       } else {
-        throw new Error('Unsupported file type. Use .txt, .md, or .epub');
+        throw new Error('Unsupported file type. Use .txt, .md, .epub, .mobi, .azw3, or .fb2');
       }
     } catch (err) {
       console.error('File upload error:', err);
@@ -232,7 +232,7 @@ Try adjusting the WPM setting to find your optimal reading speed!`;
             <input
               type="file"
               id="file-upload"
-              accept=".txt,.md,.epub"
+              accept=".txt,.md,.epub,.mobi,.azw3,.azw,.kf8,.fb2"
               onChange={handleFileUpload}
               className="hidden"
             />
@@ -245,7 +245,7 @@ Try adjusting the WPM setting to find your optimal reading speed!`;
                 Click to upload or drag and drop
               </span>
               <span className="text-xs text-muted-foreground">
-                .txt, .md, or .epub files
+                .txt, .md, .epub, .mobi, .azw3, .fb2
               </span>
             </label>
           </div>

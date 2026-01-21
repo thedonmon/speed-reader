@@ -19,7 +19,7 @@ A modern RSVP (Rapid Serial Visual Presentation) speed reading web app built wit
 
 - **Text** - Paste any text directly
 - **URL** - Fetch articles from the web (see limitations below)
-- **EPUB** - Upload and read ebook files
+- **Ebooks** - EPUB, MOBI, AZW3/KF8, and FB2 formats
 - **Markdown** - Full markdown support with syntax-highlighted code blocks
 
 ## Getting Started
@@ -36,7 +36,7 @@ Open [http://localhost:3000](http://localhost:3000) to start reading.
 
 ## URL Fetching Limitations
 
-The URL fetching feature uses [@extractus/article-extractor](https://github.com/niclin/article-extractor) to parse web pages. However, many sites have restrictions that prevent content extraction:
+The URL fetching feature uses [@extractus/article-extractor](https://github.com/extractus/article-extractor) to parse web pages. However, many sites have restrictions that prevent content extraction:
 
 ### Sites That Work Well
 
@@ -78,10 +78,10 @@ Potential enhancements for better URL support:
 - [Next.js 16](https://nextjs.org/) - React framework
 - [Tailwind CSS 4](https://tailwindcss.com/) - Styling
 - [Zustand](https://zustand.docs.pmnd.rs/) - State management
-- [Streamdown](https://github.com/niclin/streamdown) - Markdown rendering with Shiki syntax highlighting
+- [Streamdown](https://github.com/vercel/streamdown) - Markdown rendering with Shiki syntax highlighting
 - [Radix UI](https://www.radix-ui.com/) - Accessible UI components
-- [@extractus/article-extractor](https://github.com/niclin/article-extractor) - Web article extraction
-- [@lingo-reader/epub-parser](https://github.com/niclin/lingo-reader) - EPUB parsing
+- [@extractus/article-extractor](https://github.com/extractus/article-extractor) - Web article extraction
+- [@lingo-reader](https://github.com/hhk-png/lingo-reader) - Ebook parsing (EPUB, MOBI, AZW3, FB2)
 
 ## Development
 
