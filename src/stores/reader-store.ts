@@ -503,7 +503,7 @@ export const useReaderStore = create<ReaderStore>()(
       },
     }),
     {
-      name: 'speed-reader-settings',
+      name: 'skimreaper-settings',
       partialize: (state) => ({ 
         settings: state.settings,
         inputMode: state.inputMode,

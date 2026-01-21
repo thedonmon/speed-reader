@@ -1,4 +1,4 @@
-# Speed Reader
+# SkimReaper
 
 A modern RSVP (Rapid Serial Visual Presentation) speed reading web app built with Next.js. Read faster by displaying one word at a time with optimal recognition point (ORP) highlighting.
 

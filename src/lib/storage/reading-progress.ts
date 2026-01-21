@@ -1,7 +1,7 @@
 // Reading progress storage using localStorage
 // Saves and restores reading position per document
 
-const STORAGE_KEY = 'speed-reader-progress';
+const STORAGE_KEY = 'skimreaper-progress';
 const MAX_ENTRIES = 50; // Keep last 50 documents
 
 export interface ReadingProgress {

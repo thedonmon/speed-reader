@@ -14,8 +14,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Speed Reader - RSVP Speed Reading App",
-  description: "Read faster with RSVP (Rapid Serial Visual Presentation). Supports text, URLs, markdown, and EPUB files.",
+  title: "SkimReaper - RSVP Speed Reading App",
+  description: "Read faster with RSVP (Rapid Serial Visual Presentation). Supports text, URLs, markdown, and ebooks.",
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/apple-icon.png',
+  },
 };
 
 export default function RootLayout({
@@ -28,7 +32,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider defaultTheme="system" storageKey="speed-reader-theme">
+        <ThemeProvider defaultTheme="system" storageKey="skimreaper-theme">
           {children}
         </ThemeProvider>
       </body>

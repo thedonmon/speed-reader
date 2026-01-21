@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Settings, ChevronLeft, Zap, Maximize2, Minimize2, Github } from 'lucide-react';
+import { Settings, ChevronLeft, Maximize2, Minimize2, Github } from 'lucide-react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { WordDisplay } from '@/components/reader/WordDisplay';
@@ -150,9 +151,15 @@ export default function Home() {
       {/* Header */}
       <header className="border-b">
         <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Zap className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-bold">Speed Reader</h1>
+          <div className="flex items-center gap-3">
+            <Image 
+              src="/logo.png" 
+              alt="SkimReaper" 
+              width={930} 
+              height={700}
+              className="h-10 w-auto"
+            />
+            <h1 className="text-xl font-bold font-mono tracking-tight">SkimReaper</h1>
           </div>
           
           <div className="flex items-center gap-1">
@@ -309,18 +316,27 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t mt-auto">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-          <span>Speed Reader - Built with Next.js.</span>
-          <span>Inspired by <a href="https://github.com/anthonynosek/sprint-reader-chrome" className="underline hover:text-foreground">Sprint Reader</a>.</span>
-          <a 
-            href="https://github.com/thedonmon/speed-reader" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="hover:text-foreground transition-colors"
-            title="View source on GitHub"
-          >
-            <Github className="h-4 w-4" />
-          </a>
+        <div className="container mx-auto px-4 py-4 flex flex-col items-center gap-2 text-sm text-muted-foreground">
+          <Image 
+            src="/logo.png" 
+            alt="SkimReaper" 
+            width={930} 
+            height={700}
+            className="h-12 w-auto"
+          />
+          <div className="flex items-center gap-2">
+            <span>Built with Next.js.</span>
+            <span>Inspired by <a href="https://github.com/anthonynosek/sprint-reader-chrome" className="underline hover:text-foreground">Sprint Reader</a>.</span>
+            <a 
+              href="https://github.com/thedonmon/skimreaper" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors"
+              title="View source on GitHub"
+            >
+              <Github className="h-4 w-4" />
+            </a>
+          </div>
         </div>
       </footer>
     </div>
