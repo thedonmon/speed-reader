@@ -121,15 +121,15 @@ export function WordDisplay({ slide, settings, className, compact = false }: Wor
   // Check if this is a special block type
   const blockType = (slide as TextSlide & { blockType?: string }).blockType;
 
-  // Code blocks and tables - render with Streamdown
+  // Code blocks and tables - render with Streamdown (scrollable)
   if (blockType === 'code' || blockType === 'table') {
     return (
       <div className={cn(
-        'flex items-center justify-center h-full overflow-auto p-4',
+        'flex items-start justify-center h-full p-4',
         'streamdown-container',
         className
       )}>
-        <div className="w-full max-w-4xl">
+        <div className="w-full max-w-4xl max-h-full overflow-auto rounded-lg">
           <Streamdown 
             key={isDarkMode ? 'dark' : 'light'}
             plugins={{ code: codePlugin }}

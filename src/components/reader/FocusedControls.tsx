@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useCallback } from 'react';
 import { Play, Pause, Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -17,16 +18,54 @@ export function FocusedControls({ className }: FocusedControlsProps) {
     settings,
     play,
     pause,
+    next,
+    previous,
     setWPM,
     progress,
     currentIndex,
     totalSlides,
   } = useReaderStore();
 
-  const currentProgress = progress();
-  const total = totalSlides();
   const isPlaying = state === 'playing';
   const canPlay = slides.length > 0 && state !== 'loading';
+
+  // Keyboard shortcuts for focused mode
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    switch (e.code) {
+      case 'Space':
+        e.preventDefault();
+        if (isPlaying) {
+          pause();
+        } else if (canPlay) {
+          play();
+        }
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        previous();
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        next();
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setWPM(Math.min(settings.wpm + 50, 1500));
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        setWPM(Math.max(settings.wpm - 50, 50));
+        break;
+    }
+  }, [isPlaying, canPlay, play, pause, next, previous, setWPM, settings.wpm]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  const currentProgress = progress();
+  const total = totalSlides();
 
   return (
     <div className={cn('p-4 pb-8 bg-gradient-to-t from-background via-background/95 to-transparent', className)}>
@@ -78,10 +117,12 @@ export function FocusedControls({ className }: FocusedControlsProps) {
 
       {/* Gesture hints */}
       <div className="text-center text-xs text-muted-foreground mt-4 space-y-1">
-        <p>Tap to play/pause</p>
+        <p className="sm:hidden">Tap to play/pause</p>
         <p className="sm:hidden">Swipe: left/right = navigate, up/down = speed</p>
         <p className="hidden sm:block">
           <kbd className="px-1.5 py-0.5 bg-muted rounded">Space</kbd> Play/Pause
+          {' '}<kbd className="px-1.5 py-0.5 bg-muted rounded">&larr;</kbd><kbd className="px-1.5 py-0.5 bg-muted rounded">&rarr;</kbd> Navigate
+          {' '}<kbd className="px-1.5 py-0.5 bg-muted rounded">&uarr;</kbd><kbd className="px-1.5 py-0.5 bg-muted rounded">&darr;</kbd> Speed
           {' '}<kbd className="px-1.5 py-0.5 bg-muted rounded">Esc</kbd> Exit
         </p>
       </div>
