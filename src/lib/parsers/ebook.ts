@@ -55,6 +55,7 @@ function isContentStart(label: string): boolean {
 }
 
 // Common interface for all ebook parsers from @lingo-reader
+// Based on the unified EBookParser interface from @lingo-reader/shared
 interface EbookParser {
   getSpine: () => { id: string }[];
   loadChapter: (id: string) => Promise<{ html: string } | undefined> | { html: string } | undefined;
@@ -62,9 +63,8 @@ interface EbookParser {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getMetadata: () => any;
   getFileInfo: () => { fileName: string };
-  getCover?: () => string;
-  // EPUB-specific: guide references with type like "text", "toc", "cover"
-  getGuide?: () => { title: string; type: string; href: string }[];
+  getCoverImage?: () => string;
+  resolveHref: (href: string) => { id: string; selector: string } | undefined;
   destroy: () => void;
 }
 
@@ -128,59 +128,47 @@ async function getParser(file: File): Promise<EbookParser> {
 
 /**
  * Find the index of the first content chapter (skipping front matter)
- * Uses guide (EPUB), TOC labels, and heuristics to detect where main content starts
+ * Uses TOC labels and resolveHref to detect where main content starts
  */
 function findContentStartIndex(
   toc: { label: string; href: string; id?: string }[],
   spine: { id: string }[],
-  guide?: { title: string; type: string; href: string }[]
+  resolveHref: (href: string) => { id: string; selector: string } | undefined
 ): number {
-  // Method 1: Check EPUB guide for "text" type (indicates start of main content)
-  if (guide && guide.length > 0) {
-    const textGuide = guide.find(g => g.type === 'text' || g.type === 'bodymatter');
-    if (textGuide) {
-      const href = textGuide.href.split('#')[0];
-      const spineIndex = spine.findIndex(s => 
-        s.id === href || s.id.includes(href) || href.includes(s.id)
-      );
-      if (spineIndex >= 0) return spineIndex;
-    }
-  }
+  // If no TOC, start from beginning
+  if (!toc || toc.length === 0) return 0;
   
-  // Method 2: Use TOC to find first content chapter
-  if (toc && toc.length > 0) {
-    for (let i = 0; i < toc.length; i++) {
-      const label = toc[i].label;
-      const tocId = toc[i].id;
-      
-      // If it's explicitly content (Chapter 1, Prologue, etc.), start here
-      if (isContentStart(label)) {
-        // Try to match by id first (more reliable)
-        if (tocId) {
-          const spineIndex = spine.findIndex(s => s.id === tocId);
-          if (spineIndex >= 0) return spineIndex;
-        }
-        // Fall back to href matching
-        const href = toc[i].href.split('#')[0];
-        const spineIndex = spine.findIndex(s => 
-          s.id === href || s.id.includes(href) || href.includes(s.id)
-        );
+  // Look through TOC to find first content chapter
+  for (let i = 0; i < toc.length; i++) {
+    const label = toc[i].label;
+    
+    // If it's explicitly content (Chapter 1, Prologue, etc.), start here
+    if (isContentStart(label)) {
+      // Use resolveHref to get the spine id
+      const resolved = resolveHref(toc[i].href);
+      if (resolved) {
+        const spineIndex = spine.findIndex(s => s.id === resolved.id);
         if (spineIndex >= 0) return spineIndex;
       }
-      
-      // If it's not front matter, it might be content
-      if (!isFrontMatter(label)) {
-        // Check if the next few entries are also not front matter (heuristic)
-        const nextFewAreContent = toc.slice(i, i + 3).every(t => !isFrontMatter(t.label));
-        if (nextFewAreContent) {
-          if (tocId) {
-            const spineIndex = spine.findIndex(s => s.id === tocId);
-            if (spineIndex >= 0) return spineIndex;
-          }
-          const href = toc[i].href.split('#')[0];
-          const spineIndex = spine.findIndex(s => 
-            s.id === href || s.id.includes(href) || href.includes(s.id)
-          );
+      // Fallback: use TOC id if available
+      if (toc[i].id) {
+        const spineIndex = spine.findIndex(s => s.id === toc[i].id);
+        if (spineIndex >= 0) return spineIndex;
+      }
+    }
+    
+    // If it's not front matter, it might be content
+    if (!isFrontMatter(label)) {
+      // Check if the next few entries are also not front matter (heuristic)
+      const nextFewAreContent = toc.slice(i, i + 3).every(t => !isFrontMatter(t.label));
+      if (nextFewAreContent) {
+        const resolved = resolveHref(toc[i].href);
+        if (resolved) {
+          const spineIndex = spine.findIndex(s => s.id === resolved.id);
+          if (spineIndex >= 0) return spineIndex;
+        }
+        if (toc[i].id) {
+          const spineIndex = spine.findIndex(s => s.id === toc[i].id);
           if (spineIndex >= 0) return spineIndex;
         }
       }
@@ -202,8 +190,6 @@ export async function parseEbookFile(file: File): Promise<ParsedContent> {
     const spine = parser.getSpine();
     const metadata = parser.getMetadata();
     const toc = parser.getToc();
-    // Get guide if available (EPUB-specific, helps identify content start)
-    const guide = parser.getGuide?.();
     
     const blocks: ContentBlock[] = [];
     
@@ -217,7 +203,8 @@ export async function parseEbookFile(file: File): Promise<ParsedContent> {
     }
     
     // Find where actual content starts (skip front matter)
-    const startIndex = findContentStartIndex(toc, spine, guide);
+    // Use resolveHref to properly map TOC entries to spine items
+    const startIndex = findContentStartIndex(toc, spine, (href) => parser.resolveHref(href));
     
     // Process each chapter starting from content
     for (let i = startIndex; i < spine.length; i++) {
