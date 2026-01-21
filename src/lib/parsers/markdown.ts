@@ -26,9 +26,21 @@ function identifyBlockType(block: string): { type: ContentBlockType; metadata?: 
     return { type: 'code' };
   }
   
-  // Table (has | and separator row with ---)
-  if (/^\|.+\|/.test(trimmed) && /\|[\s\-:|]+\|/.test(trimmed)) {
-    return { type: 'table' };
+  // Table detection - supports both with and without leading pipes
+  // Format 1: | Col1 | Col2 |  (with leading/trailing pipes)
+  // Format 2: Col1 | Col2      (without leading pipes)
+  // Both require a separator row with dashes (and optional colons for alignment)
+  const lines = trimmed.split('\n').filter(l => l.trim());
+  if (lines.length >= 2) {
+    const hasColumnSeparators = lines[0].includes('|');
+    // Separator row: contains only |, -, :, and whitespace
+    const separatorRowRegex = /^[\s|:-]+$/;
+    const hasSeparatorRow = lines.some(line => 
+      separatorRowRegex.test(line) && line.includes('-') && line.includes('|')
+    );
+    if (hasColumnSeparators && hasSeparatorRow) {
+      return { type: 'table' };
+    }
   }
   
   // Heading
@@ -75,6 +87,37 @@ function identifyBlockType(block: string): { type: ContentBlockType; metadata?: 
 }
 
 /**
+ * Strip markdown formatting from text for clean RSVP display
+ * Converts markdown syntax to plain text
+ */
+function stripMarkdownFormatting(text: string): string {
+  return text
+    // Links: [text](url) -> text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    // Images: ![alt](url) -> (skip or show alt)
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1 ')
+    // Bold: **text** or __text__ -> text
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    // Italic: *text* or _text_ -> text
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    // Strikethrough: ~~text~~ -> text
+    .replace(/~~([^~]+)~~/g, '$1')
+    // Inline code: `code` -> code
+    .replace(/`([^`]+)`/g, '$1')
+    // Reference-style links: [text][ref] -> text
+    .replace(/\[([^\]]+)\]\[[^\]]*\]/g, '$1')
+    // Autolinks: <url> -> url
+    .replace(/<(https?:\/\/[^>]+)>/g, '$1')
+    // HTML tags
+    .replace(/<[^>]+>/g, '')
+    // Clean up extra whitespace
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Extract clean content from a markdown block
  */
 function extractContent(block: string, type: ContentBlockType): string {
@@ -90,26 +133,30 @@ function extractContent(block: string, type: ContentBlockType): string {
       return trimmed;
       
     case 'heading':
-      // Remove # prefix for RSVP display, but keep markdown for rendering
-      return trimmed;
+      // Remove # prefix and strip markdown formatting for RSVP display
+      const headingText = trimmed.replace(/^#+\s*/, '');
+      return stripMarkdownFormatting(headingText);
       
     case 'blockquote':
-      // Remove > prefix for RSVP, but keep for rendering
-      return trimmed;
+      // Remove > prefix and strip formatting
+      const quoteText = trimmed.replace(/^>\s*/gm, '');
+      return stripMarkdownFormatting(quoteText);
       
     case 'image':
-      // Keep full markdown
-      return trimmed;
+      // For standalone images, just extract alt text
+      const altMatch = trimmed.match(/!\[([^\]]*)\]/);
+      return altMatch?.[1] || '';
       
     case 'list':
-      // Keep list as-is, but we'll RSVP the text
-      return trimmed;
+      // Strip formatting from list items
+      return stripMarkdownFormatting(trimmed);
       
     case 'hr':
       return '---';
       
     default:
-      return trimmed;
+      // Regular text - strip markdown formatting
+      return stripMarkdownFormatting(trimmed);
   }
 }
 
