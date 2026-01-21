@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Settings, ChevronLeft, Zap, Maximize2, Minimize2 } from 'lucide-react';
+import { Settings, ChevronLeft, Zap, Maximize2, Minimize2, Github } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { WordDisplay } from '@/components/reader/WordDisplay';
@@ -309,9 +309,18 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t mt-auto">
-        <div className="container mx-auto px-4 py-4 text-center text-sm text-muted-foreground">
-          Speed Reader - Built with Next.js. 
-          Inspired by <a href="https://github.com/anthonynosek/sprint-reader-chrome" className="underline hover:text-foreground">Sprint Reader</a>.
+        <div className="container mx-auto px-4 py-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <span>Speed Reader - Built with Next.js.</span>
+          <span>Inspired by <a href="https://github.com/anthonynosek/sprint-reader-chrome" className="underline hover:text-foreground">Sprint Reader</a>.</span>
+          <a 
+            href="https://github.com/thedonmon/speed-reader" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="hover:text-foreground transition-colors"
+            title="View source on GitHub"
+          >
+            <Github className="h-4 w-4" />
+          </a>
         </div>
       </footer>
     </div>
