@@ -5,15 +5,66 @@ import type { ParsedContent, ContentBlock } from '../engine/types';
 
 export type EbookFormat = 'epub' | 'mobi' | 'azw3' | 'fb2';
 
+// Common front matter TOC labels to skip (case-insensitive)
+const FRONT_MATTER_PATTERNS = [
+  /^copyright/i,
+  /^title\s*page/i,
+  /^half\s*title/i,
+  /^also\s*by/i,
+  /^books?\s*by/i,
+  /^other\s*books/i,
+  /^praise\s*for/i,
+  /^advance\s*praise/i,
+  /^dedication/i,
+  /^epigraph/i,
+  /^table\s*of\s*contents/i,
+  /^contents/i,
+  /^foreword/i,
+  /^preface/i,
+  /^acknowledgments?/i,
+  /^about\s*the\s*author/i,
+  /^author'?s?\s*note/i,
+  /^editor'?s?\s*note/i,
+  /^publisher'?s?\s*note/i,
+  /^cover/i,
+  /^frontmatter/i,
+  /^front\s*matter/i,
+];
+
+// Patterns that indicate we've reached actual content
+const CONTENT_START_PATTERNS = [
+  /^(chapter|part|book|section|prologue|introduction)\s*[0-9ivxlcdm:.\-]*/i,
+  /^(one|two|three|four|five|six|seven|eight|nine|ten)\b/i,
+  /^[0-9]+\s*[.:]\s*/,  // "1." or "1:" at start
+];
+
+/**
+ * Check if a TOC label indicates front matter
+ */
+function isFrontMatter(label: string): boolean {
+  const trimmed = label.trim();
+  return FRONT_MATTER_PATTERNS.some(pattern => pattern.test(trimmed));
+}
+
+/**
+ * Check if a label indicates the start of main content
+ */
+function isContentStart(label: string): boolean {
+  const trimmed = label.trim();
+  return CONTENT_START_PATTERNS.some(pattern => pattern.test(trimmed));
+}
+
 // Common interface for all ebook parsers from @lingo-reader
 interface EbookParser {
   getSpine: () => { id: string }[];
   loadChapter: (id: string) => Promise<{ html: string } | undefined> | { html: string } | undefined;
-  getToc: () => { label: string; href: string; children?: unknown[] }[];
+  getToc: () => { label: string; href: string; id?: string; children?: unknown[] }[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getMetadata: () => any;
   getFileInfo: () => { fileName: string };
   getCover?: () => string;
+  // EPUB-specific: guide references with type like "text", "toc", "cover"
+  getGuide?: () => { title: string; type: string; href: string }[];
   destroy: () => void;
 }
 
@@ -76,6 +127,71 @@ async function getParser(file: File): Promise<EbookParser> {
 }
 
 /**
+ * Find the index of the first content chapter (skipping front matter)
+ * Uses guide (EPUB), TOC labels, and heuristics to detect where main content starts
+ */
+function findContentStartIndex(
+  toc: { label: string; href: string; id?: string }[],
+  spine: { id: string }[],
+  guide?: { title: string; type: string; href: string }[]
+): number {
+  // Method 1: Check EPUB guide for "text" type (indicates start of main content)
+  if (guide && guide.length > 0) {
+    const textGuide = guide.find(g => g.type === 'text' || g.type === 'bodymatter');
+    if (textGuide) {
+      const href = textGuide.href.split('#')[0];
+      const spineIndex = spine.findIndex(s => 
+        s.id === href || s.id.includes(href) || href.includes(s.id)
+      );
+      if (spineIndex >= 0) return spineIndex;
+    }
+  }
+  
+  // Method 2: Use TOC to find first content chapter
+  if (toc && toc.length > 0) {
+    for (let i = 0; i < toc.length; i++) {
+      const label = toc[i].label;
+      const tocId = toc[i].id;
+      
+      // If it's explicitly content (Chapter 1, Prologue, etc.), start here
+      if (isContentStart(label)) {
+        // Try to match by id first (more reliable)
+        if (tocId) {
+          const spineIndex = spine.findIndex(s => s.id === tocId);
+          if (spineIndex >= 0) return spineIndex;
+        }
+        // Fall back to href matching
+        const href = toc[i].href.split('#')[0];
+        const spineIndex = spine.findIndex(s => 
+          s.id === href || s.id.includes(href) || href.includes(s.id)
+        );
+        if (spineIndex >= 0) return spineIndex;
+      }
+      
+      // If it's not front matter, it might be content
+      if (!isFrontMatter(label)) {
+        // Check if the next few entries are also not front matter (heuristic)
+        const nextFewAreContent = toc.slice(i, i + 3).every(t => !isFrontMatter(t.label));
+        if (nextFewAreContent) {
+          if (tocId) {
+            const spineIndex = spine.findIndex(s => s.id === tocId);
+            if (spineIndex >= 0) return spineIndex;
+          }
+          const href = toc[i].href.split('#')[0];
+          const spineIndex = spine.findIndex(s => 
+            s.id === href || s.id.includes(href) || href.includes(s.id)
+          );
+          if (spineIndex >= 0) return spineIndex;
+        }
+      }
+    }
+  }
+  
+  // Fallback: start from beginning
+  return 0;
+}
+
+/**
  * Parse an ebook file and extract structured content
  * Supports EPUB, MOBI, AZW3/KF8, and FB2 formats
  */
@@ -85,6 +201,9 @@ export async function parseEbookFile(file: File): Promise<ParsedContent> {
   try {
     const spine = parser.getSpine();
     const metadata = parser.getMetadata();
+    const toc = parser.getToc();
+    // Get guide if available (EPUB-specific, helps identify content start)
+    const guide = parser.getGuide?.();
     
     const blocks: ContentBlock[] = [];
     
@@ -97,8 +216,12 @@ export async function parseEbookFile(file: File): Promise<ParsedContent> {
       });
     }
     
-    // Process each chapter
-    for (const spineItem of spine) {
+    // Find where actual content starts (skip front matter)
+    const startIndex = findContentStartIndex(toc, spine, guide);
+    
+    // Process each chapter starting from content
+    for (let i = startIndex; i < spine.length; i++) {
+      const spineItem = spine[i];
       // loadChapter is async for EPUB, sync for MOBI/FB2
       // Using Promise.resolve() handles both cases
       const chapter = await Promise.resolve(parser.loadChapter(spineItem.id));

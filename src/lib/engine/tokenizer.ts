@@ -146,6 +146,15 @@ function splitLongWord(word: string, maxLength: number = 10): string[] {
 }
 
 /**
+ * Check if a string is only punctuation/symbols (no actual letters or numbers)
+ */
+function isPunctuationOnly(text: string): boolean {
+  // Remove all punctuation, symbols, and whitespace
+  const stripped = text.replace(/[\s\p{P}\p{S}]/gu, '');
+  return stripped.length === 0;
+}
+
+/**
  * Second pass: Clean up empty slides and prepare final structure
  */
 function splitTextSecondPass(
@@ -153,7 +162,12 @@ function splitTextSecondPass(
   deleteEmpty: boolean = true
 ): FirstPassItem[] {
   if (deleteEmpty) {
-    return firstPass.filter(item => item.text && item.text.trim());
+    return firstPass.filter(item => {
+      if (!item.text || !item.text.trim()) return false;
+      // Filter out punctuation-only items (e.g., "—", "...", """, etc.)
+      if (isPunctuationOnly(item.text)) return false;
+      return true;
+    });
   }
   return firstPass;
 }
