@@ -10,6 +10,12 @@ import {
   estimateReadingTime, 
   type ChunkedProcessor 
 } from '@/lib/engine/chunked-processor';
+import {
+  saveProgress,
+  getProgress,
+  generateContentId,
+  type ReadingProgress,
+} from '@/lib/storage/reading-progress';
 
 export type ReaderState = 'idle' | 'loading' | 'ready' | 'playing' | 'paused' | 'finished';
 
@@ -39,6 +45,10 @@ interface ReaderStore {
   sourceTitle: string;
   sourceInfo: { words: number; minutes: number; seconds: number } | null;
   
+  // Content identification for progress tracking
+  contentId: string | null;
+  savedProgress: ReadingProgress | null;
+  
   // Playback state
   state: ReaderState;
   currentIndex: number;
@@ -57,6 +67,11 @@ interface ReaderStore {
   loadContent: (content: ParsedContent) => void;
   processMoreChunks: () => void;
   clear: () => void;
+  
+  // Actions - Progress
+  saveCurrentProgress: () => void;
+  resumeFromSaved: () => void;
+  dismissSavedProgress: () => void;
   
   // Actions - Playback
   play: () => void;
@@ -97,6 +112,8 @@ export const useReaderStore = create<ReaderStore>()(
       
       sourceTitle: '',
       sourceInfo: null,
+      contentId: null,
+      savedProgress: null,
       
       state: 'idle',
       currentIndex: 0,
@@ -114,6 +131,10 @@ export const useReaderStore = create<ReaderStore>()(
         const { settings } = get();
         const isLarge = text.length > LARGE_TEXT_THRESHOLD;
         const readingEstimate = estimateReadingTime(text, settings.wpm);
+        
+        // Generate content ID and check for saved progress
+        const contentId = generateContentId(text, title);
+        const savedProgress = getProgress(contentId);
         
         if (isLarge) {
           // Use chunked processing for large texts
@@ -133,6 +154,8 @@ export const useReaderStore = create<ReaderStore>()(
               Math.round((processor.processedSlidesCount / processor.totalEstimatedSlides) * 100),
             sourceTitle: title || 'Document',
             sourceInfo: readingEstimate,
+            contentId,
+            savedProgress,
             state: 'ready',
             currentIndex: 0,
             playbackPhase: 'pre',
@@ -156,6 +179,8 @@ export const useReaderStore = create<ReaderStore>()(
             processingProgress: 100,
             sourceTitle: title || 'Document',
             sourceInfo: readingEstimate,
+            contentId,
+            savedProgress,
             state: 'ready',
             currentIndex: 0,
             playbackPhase: 'pre',
@@ -171,6 +196,10 @@ export const useReaderStore = create<ReaderStore>()(
         const totalText = content.blocks.map(b => b.content).join(' ');
         const readingEstimate = estimateReadingTime(totalText, settings.wpm);
         
+        // Generate content ID and check for saved progress
+        const contentId = generateContentId(totalText, content.title);
+        const savedProgress = getProgress(contentId);
+        
         set({
           slides,
           stats,
@@ -181,6 +210,8 @@ export const useReaderStore = create<ReaderStore>()(
           processingProgress: 100,
           sourceTitle: content.title || 'Document',
           sourceInfo: readingEstimate,
+          contentId,
+          savedProgress,
           state: 'ready',
           currentIndex: 0,
           playbackPhase: 'pre',
@@ -229,12 +260,59 @@ export const useReaderStore = create<ReaderStore>()(
           processingProgress: 0,
           sourceTitle: '',
           sourceInfo: null,
+          contentId: null,
+          savedProgress: null,
           state: 'idle',
           currentIndex: 0,
           playbackPhase: 'pre',
           inputText: '',
           inputUrl: '',
         });
+      },
+      
+      // Progress actions
+      saveCurrentProgress: () => {
+        const { contentId, sourceTitle, currentIndex, slides, settings, chunkedProcessor } = get();
+        if (!contentId || slides.length === 0) return;
+        
+        const totalSlides = chunkedProcessor 
+          ? chunkedProcessor.totalEstimatedSlides 
+          : slides.length;
+        
+        saveProgress(contentId, sourceTitle, currentIndex, totalSlides, settings.wpm);
+      },
+      
+      resumeFromSaved: () => {
+        const { savedProgress, slides, chunkedProcessor } = get();
+        if (!savedProgress) return;
+        
+        const targetIndex = savedProgress.position;
+        
+        // For chunked processing, ensure target slide is processed
+        if (chunkedProcessor && targetIndex >= slides.length) {
+          while (!chunkedProcessor.isFullyProcessed && chunkedProcessor.processedSlidesCount <= targetIndex) {
+            chunkedProcessor.processMore();
+          }
+          const allSlides = chunkedProcessor.getSlides(0, chunkedProcessor.processedSlidesCount);
+          set({ 
+            slides: allSlides,
+            processingProgress: chunkedProcessor.isFullyProcessed ? 100 :
+              Math.round((chunkedProcessor.processedSlidesCount / chunkedProcessor.totalEstimatedSlides) * 100),
+          });
+        }
+        
+        const currentSlides = get().slides;
+        const validIndex = Math.min(targetIndex, currentSlides.length - 1);
+        
+        set({
+          currentIndex: Math.max(0, validIndex),
+          playbackPhase: 'pre',
+          savedProgress: null, // Dismiss the prompt after resuming
+        });
+      },
+      
+      dismissSavedProgress: () => {
+        set({ savedProgress: null });
       },
       
       // Playback actions
@@ -254,7 +332,11 @@ export const useReaderStore = create<ReaderStore>()(
         set({ state: 'playing' });
       },
       
-      pause: () => set({ state: 'paused' }),
+      pause: () => {
+        set({ state: 'paused' });
+        // Auto-save progress on pause
+        get().saveCurrentProgress();
+      },
       
       stop: () => set({ 
         state: 'ready', 
@@ -274,12 +356,17 @@ export const useReaderStore = create<ReaderStore>()(
         }
         
         if (currentIndex < slides.length - 1) {
+          const wasPaused = state === 'playing';
           set({ 
             currentIndex: currentIndex + 1,
             playbackPhase: 'pre',
             // Pause when manually navigating
-            state: state === 'playing' ? 'paused' : state,
+            state: wasPaused ? 'paused' : state,
           });
+          // Save progress on manual navigation
+          if (wasPaused) {
+            get().saveCurrentProgress();
+          }
         } else {
           set({ state: 'finished' });
         }
@@ -288,12 +375,17 @@ export const useReaderStore = create<ReaderStore>()(
       previous: () => {
         const { currentIndex, state } = get();
         if (currentIndex > 0) {
+          const wasPaused = state === 'playing';
           set({ 
             currentIndex: currentIndex - 1,
             playbackPhase: 'pre',
             // Pause when manually navigating
-            state: state === 'playing' ? 'paused' : state,
+            state: wasPaused ? 'paused' : state,
           });
+          // Save progress on manual navigation
+          if (wasPaused) {
+            get().saveCurrentProgress();
+          }
         }
       },
       

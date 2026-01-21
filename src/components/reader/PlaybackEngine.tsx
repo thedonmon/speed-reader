@@ -14,6 +14,8 @@ export function PlaybackEngine() {
     playbackPhase,
     slides,
     advancePhase,
+    saveCurrentProgress,
+    contentId,
   } = useReaderStore();
 
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -70,6 +72,30 @@ export function PlaybackEngine() {
       }
     };
   }, [state, currentIndex, playbackPhase, slides, advancePhase]);
+
+  // Save progress when user leaves the page
+  useEffect(() => {
+    if (!contentId) return;
+
+    const handleBeforeUnload = () => {
+      saveCurrentProgress();
+    };
+
+    // Save on page hide (works better on mobile than beforeunload)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        saveCurrentProgress();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [contentId, saveCurrentProgress]);
 
   // This component doesn't render anything
   return null;

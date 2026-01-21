@@ -11,6 +11,7 @@ A modern RSVP (Rapid Serial Visual Presentation) speed reading web app built wit
   - Word Length - Longer words get more time
   - Word Frequency - Common words flash faster, rare words slower
 - **Dark Mode** - Full dark/light theme support
+- **Reading Progress** - Automatically saves your position; resume where you left off
 - **Focused Reading Mode** - Fullscreen distraction-free reading with auto-hiding controls
 - **Touch Gestures** - Swipe left/right to navigate, up/down for speed, tap to play/pause
 - **Keyboard Shortcuts** - Space (play/pause), Arrow keys (navigate/speed), R (reset)

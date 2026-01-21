@@ -10,6 +10,7 @@ import { FocusedControls } from '@/components/reader/FocusedControls';
 import { PlaybackEngine } from '@/components/reader/PlaybackEngine';
 import { SettingsPanel } from '@/components/reader/SettingsPanel';
 import { InputPanel } from '@/components/reader/InputPanel';
+import { ResumePrompt } from '@/components/reader/ResumePrompt';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useReaderStore } from '@/stores/reader-store';
 import { useTouchGestures } from '@/hooks/useTouchGestures';
@@ -200,6 +201,9 @@ export default function Home() {
             ) : (
               /* Reading mode */
               <>
+                {/* Resume prompt */}
+                <ResumePrompt />
+
                 {/* Word display area */}
                 <Card className="overflow-hidden touch-manipulation">
                   <CardContent className="p-0">
