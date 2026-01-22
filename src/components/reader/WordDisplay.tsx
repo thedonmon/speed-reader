@@ -123,6 +123,13 @@ export function WordDisplay({ slide, settings, className, compact = false }: Wor
 
   // Code blocks and tables - render with Streamdown (scrollable)
   if (blockType === 'code' || blockType === 'table') {
+    // WORKAROUND: Streamdown incorrectly interprets $$ inside code blocks as math delimiters
+    // Escape $$ by inserting a zero-width space between them
+    // TODO: Remove once streamdown releases fix from https://github.com/vercel/streamdown/pull/365
+    const safeText = blockType === 'code' 
+      ? slide.text.replace(/\$\$/g, '$\u200B$')  // Zero-width space between $
+      : slide.text;
+    
     return (
       <div className={cn(
         'flex items-start justify-center h-full p-4',
@@ -134,7 +141,7 @@ export function WordDisplay({ slide, settings, className, compact = false }: Wor
             key={isDarkMode ? 'dark' : 'light'}
             plugins={{ code: codePlugin }}
           >
-            {slide.text}
+            {safeText}
           </Streamdown>
         </div>
       </div>
