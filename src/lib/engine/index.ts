@@ -71,8 +71,7 @@ export function processContent(
         break;
         
       case 'hr':
-        // Horizontal rule: brief pause
-        allSlides.push(createBlockSlide(block, settings, 'hr'));
+        // Horizontal rules are visual separators - skip them entirely in RSVP
         break;
         
       case 'blockquote':
@@ -114,7 +113,7 @@ export function processContent(
 function createBlockSlide(
   block: ContentBlock,
   settings: ReaderSettings,
-  type: 'code' | 'heading' | 'image' | 'hr' | 'table'
+  type: 'code' | 'heading' | 'image' | 'table'
 ): TextSlide & { blockType: string; metadata?: ContentBlock['metadata'] } {
   // Different pause durations for different block types
   // Duration scales with content length for code and tables
@@ -126,7 +125,6 @@ function createBlockSlide(
     table: Math.max(3000, Math.min(15000, lineCount * baseLineDuration)), // 3-15 seconds based on rows
     heading: 1500, // 1.5 seconds for headings
     image: 3000,   // 3 seconds for images
-    hr: 500,       // 0.5 seconds for horizontal rules
   };
   
   return {
@@ -134,7 +132,7 @@ function createBlockSlide(
     textOriginal: block.content,
     duration: pauseDurations[type] || 1000,
     preDelay: 0,
-    postDelay: type === 'hr' ? 0 : settings.pauseAfterParagraphDelay,
+    postDelay: settings.pauseAfterParagraphDelay,
     wpm: settings.wpm,
     optimalLetterPosition: 1,
     pixelOffset: 0,

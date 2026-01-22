@@ -6,6 +6,49 @@
 import { parseMarkdownIntoBlocks } from 'streamdown';
 import type { ParsedContent, ContentBlock, ContentBlockType } from '../engine/types';
 
+// TODO: Remove this workaround once streamdown releases the fix
+// WORKAROUND: streamdown's footnote detection regex incorrectly matches [^ patterns
+// inside code blocks (e.g., regex like [^\s...]). We escape these before parsing
+// and restore them after. Fix submitted: https://github.com/vercel/streamdown/pull/365
+// Once merged, delete: CARET_BRACKET_PLACEHOLDER, escapeCodeBlockPatterns,
+// restoreCodeBlockPatterns, and their usage in parseMarkdown()
+const CARET_BRACKET_PLACEHOLDER = '\u0000CARET_BRACKET\u0000';
+
+/**
+ * Escape [^ patterns inside fenced code blocks to prevent streamdown's
+ * footnote detection from incorrectly matching them
+ */
+function escapeCodeBlockPatterns(text: string): string {
+  const lines = text.split('\n');
+  const result: string[] = [];
+  let inCodeBlock = false;
+  
+  for (const line of lines) {
+    // Check for fenced code block delimiter
+    if (/^```/.test(line.trim()) || /^~~~/.test(line.trim())) {
+      inCodeBlock = !inCodeBlock;
+      result.push(line);
+      continue;
+    }
+    
+    // If inside a code block, escape [^ patterns
+    if (inCodeBlock && line.includes('[^')) {
+      result.push(line.replace(/\[\^/g, CARET_BRACKET_PLACEHOLDER));
+    } else {
+      result.push(line);
+    }
+  }
+  
+  return result.join('\n');
+}
+
+/**
+ * Restore escaped [^ patterns
+ */
+function restoreCodeBlockPatterns(text: string): string {
+  return text.replace(new RegExp(CARET_BRACKET_PLACEHOLDER, 'g'), '[^');
+}
+
 /**
  * Identify the type of a markdown block
  */
@@ -161,18 +204,25 @@ function extractContent(block: string, type: ContentBlockType): string {
 }
 
 /**
- * Parses markdown text using streamdown and identifies block types
+ * Parses markdown text and identifies block types
  * Code blocks and tables are kept whole for rendering
  * Regular text is prepared for RSVP processing
  */
 export function parseMarkdown(text: string): ParsedContent {
+  // WORKAROUND: Escape [^ patterns in code blocks before parsing
+  // to prevent streamdown's footnote detection from matching them
+  const escapedText = escapeCodeBlockPatterns(text);
+  
   // Use streamdown to split into blocks
-  const rawBlocks = parseMarkdownIntoBlocks(text);
+  const rawBlocks = parseMarkdownIntoBlocks(escapedText);
   
   const blocks: ContentBlock[] = [];
   
-  for (const rawBlock of rawBlocks) {
+  for (let rawBlock of rawBlocks) {
     if (!rawBlock.trim()) continue;
+    
+    // Restore escaped patterns
+    rawBlock = restoreCodeBlockPatterns(rawBlock);
     
     const { type, metadata } = identifyBlockType(rawBlock);
     const content = extractContent(rawBlock, type);

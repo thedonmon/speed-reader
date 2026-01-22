@@ -188,6 +188,8 @@ export function WordDisplay({ slide, settings, className, compact = false }: Wor
     );
   }
 
+
+
   // Regular text display with ORP highlighting
   const justifyClass = {
     centered: 'justify-center',
