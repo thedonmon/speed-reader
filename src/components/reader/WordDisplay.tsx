@@ -12,7 +12,7 @@ import { useIsDarkMode } from '@/hooks/useIsDarkMode';
 // So we swap plugins based on the active theme instead.
 const lightCodePlugin = createCodePlugin({ themes: ['github-light', 'github-light'] });
 const darkCodePlugin = createCodePlugin({ themes: ['dracula', 'dracula'] });
-import type { TextSlide, BlockSlide } from '@/lib/engine/types';
+import type { TextSlide } from '@/lib/engine/types';
 
 interface WordDisplayProps {
   slide: TextSlide | null;
@@ -71,20 +71,19 @@ export function WordDisplay({ slide, settings, className, compact = false }: Wor
   const isDarkMode = useIsDarkMode();
   const codePlugin = isDarkMode ? darkCodePlugin : lightCodePlugin;
 
-  const { chars, focalIndex, paddingLeft } = useMemo(() => {
+  const { chars, paddingLeft } = useMemo(() => {
     if (!slide) {
-      return { chars: [], focalIndex: -1, paddingLeft: 0 };
+      return { chars: [], paddingLeft: 0 };
     }
 
     let text = slide.text;
-    let focal = slide.optimalLetterPosition - 1; // Convert to 0-indexed
+    const focal = slide.optimalLetterPosition - 1; // Convert to 0-indexed
 
     // Add focal character if using optimalWithFocal
     if (settings.textPosition === 'optimalWithFocal') {
       const before = text.slice(0, focal);
       const after = text.slice(focal);
       text = before + settings.focalCharacter + after;
-      focal = focal; // Focal stays at same position
     }
 
     const chars = text.split('').map((char, i) => ({
@@ -98,7 +97,7 @@ export function WordDisplay({ slide, settings, className, compact = false }: Wor
       paddingLeft = slide.pixelOffset;
     }
 
-    return { chars, focalIndex: focal, paddingLeft };
+    return { chars, paddingLeft };
   }, [slide, settings]);
 
   // Show focal arrows for optimal positioning modes

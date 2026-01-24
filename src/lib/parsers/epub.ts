@@ -23,8 +23,8 @@ interface EpubFile {
  */
 async function getParser(): Promise<(file: File) => Promise<EpubFile>> {
   if (!initEpubFile) {
-    const module = await import('@lingo-reader/epub-parser');
-    initEpubFile = module.initEpubFile;
+    const epubModule = await import('@lingo-reader/epub-parser');
+    initEpubFile = epubModule.initEpubFile;
   }
   return initEpubFile;
 }
@@ -39,7 +39,6 @@ export async function parseEpubFile(file: File): Promise<ParsedContent> {
   try {
     const spine = epub.getSpine();
     const metadata = epub.getMetadata();
-    const toc = epub.getToc();
     
     const blocks: ContentBlock[] = [];
     

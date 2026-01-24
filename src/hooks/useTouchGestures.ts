@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback } from 'react';
 
 interface TouchGestureOptions {
   onSwipeLeft?: () => void;
@@ -21,7 +21,7 @@ export function useTouchGestures(options: TouchGestureOptions) {
     minSwipeDistance = 50,
   } = options;
 
-  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number; time: number; target: EventTarget | null } | null>(null);
   const touchMoveRef = useRef<{ x: number; y: number } | null>(null);
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
@@ -30,6 +30,7 @@ export function useTouchGestures(options: TouchGestureOptions) {
       x: touch.clientX,
       y: touch.clientY,
       time: Date.now(),
+      target: e.target,
     };
     touchMoveRef.current = null;
   }, []);
@@ -56,7 +57,13 @@ export function useTouchGestures(options: TouchGestureOptions) {
 
     // Check if it's a tap (short duration, minimal movement)
     if (elapsed < 300 && absX < 10 && absY < 10) {
-      onTap?.();
+      // Don't trigger tap if the touch started on an interactive element
+      // Use the original touch target, not the touchend target
+      const target = start.target as HTMLElement | null;
+      const isInteractive = target?.closest('button, a, input, [role="button"], [data-no-tap]');
+      if (!isInteractive) {
+        onTap?.();
+      }
       touchStartRef.current = null;
       return;
     }

@@ -7,7 +7,7 @@ export * from './timing';
 export { getWordInformation } from './word-frequency';
 
 import type { TextSlide, ReaderSettings, SlideShowData, ParsedContent, ContentBlock } from './types';
-import { tokenizeText, calculateORP, calculatePixelOffset } from './tokenizer';
+import { tokenizeText, calculatePixelOffset } from './tokenizer';
 import { applyTiming, calculateSlideShowData } from './timing';
 
 /**

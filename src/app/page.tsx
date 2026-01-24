@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Settings, ChevronLeft, Maximize2, Minimize2, Github } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef, Suspense, useEffectEvent } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Settings, ChevronLeft, Maximize2, Minimize2, Github, FileText } from 'lucide-react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,31 +13,112 @@ import { PlaybackEngine } from '@/components/reader/PlaybackEngine';
 import { SettingsPanel } from '@/components/reader/SettingsPanel';
 import { InputPanel } from '@/components/reader/InputPanel';
 import { ResumePrompt } from '@/components/reader/ResumePrompt';
+import { DocumentViewer } from '@/components/reader/DocumentViewer';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useReaderStore } from '@/stores/reader-store';
 import { useTouchGestures } from '@/hooks/useTouchGestures';
 import { cn } from '@/lib/utils';
+import { parseMarkdown, isMarkdown } from '@/lib/parsers/markdown';
 
+// Wrapper component to handle Suspense for useSearchParams
 export default function Home() {
+  return (
+    <Suspense fallback={<HomeLoading />}>
+      <HomeContent />
+    </Suspense>
+  );
+}
+
+// Loading fallback
+function HomeLoading() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+    </div>
+  );
+}
+
+// URL loading state
+type UrlLoadState = { loading: boolean; error: string | null };
+
+function HomeContent() {
+  const searchParams = useSearchParams();
   const [showSettings, setShowSettings] = useState(false);
+  const [showDocumentViewer, setShowDocumentViewer] = useState(false);
   const [focusedMode, setFocusedMode] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
-  const { state, slides, settings, clear, currentSlide, play, pause, next, previous, setWPM } = useReaderStore();
+  const [urlLoadState, setUrlLoadState] = useState<UrlLoadState>({ loading: false, error: null });
+  const urlLoadedRef = useRef(false);
+  const { state, slides, settings, clear, currentSlide, play, pause, next, previous, setWPM, loadText, loadContent } = useReaderStore();
   const focusedContainerRef = useRef<HTMLDivElement>(null);
   
   const hasContent = slides.length > 0;
-  const isReading = state === 'playing' || state === 'paused' || state === 'ready' || state === 'finished';
   const isPlaying = state === 'playing';
 
+  // Handle URL query parameter (?url=...)
+  // Using useEffectEvent for the fetch handler to avoid lint warnings
+  const onFetchUrl = useEffectEvent(async (url: string) => {
+    setUrlLoadState({ loading: true, error: null });
+
+    try {
+      const response = await fetch('/api/fetch-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to fetch URL');
+      }
+
+      const data = await response.json();
+      
+      if (data.content) {
+        if (isMarkdown(data.content)) {
+          const parsed = parseMarkdown(data.content);
+          parsed.title = parsed.title || data.title;
+          loadContent(parsed);
+        } else {
+          loadText(data.content, data.title);
+        }
+        setUrlLoadState({ loading: false, error: null });
+      } else {
+        throw new Error('No content found');
+      }
+    } catch (err) {
+      setUrlLoadState({ 
+        loading: false, 
+        error: err instanceof Error ? err.message : 'Failed to fetch URL' 
+      });
+    }
+  });
+
+  useEffect(() => {
+    const urlParam = searchParams.get('url');
+    if (!urlParam || urlLoadedRef.current || hasContent) return;
+    
+    urlLoadedRef.current = true;
+    onFetchUrl(urlParam);
+  }, [searchParams, hasContent]);
+
   // Auto-hide controls in focused mode when playing
+  const onShowControls = useEffectEvent(() => {
+    setControlsVisible(true);
+  });
+
+  const onHideControls = useEffectEvent(() => {
+    setControlsVisible(false);
+  });
+
   useEffect(() => {
     if (!focusedMode || !isPlaying) {
-      setControlsVisible(true);
+      onShowControls();
       return;
     }
 
     const timer = setTimeout(() => {
-      setControlsVisible(false);
+      onHideControls();
     }, 3000);
 
     return () => clearTimeout(timer);
@@ -97,10 +179,13 @@ export default function Home() {
         <PlaybackEngine />
         
         {/* Minimal header - auto-hides */}
-        <header className={cn(
-          "absolute top-0 left-0 right-0 z-10 transition-opacity duration-300",
-          controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
-        )}>
+        <header 
+          className={cn(
+            "absolute top-0 left-0 right-0 z-10 transition-opacity duration-300",
+            controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+          )}
+          data-no-tap
+        >
           <div className="flex items-center justify-between p-4">
             <Button 
               variant="ghost" 
@@ -110,7 +195,20 @@ export default function Home() {
               <Minimize2 className="h-4 w-4 mr-2" />
               Exit
             </Button>
-            <ThemeToggle />
+            <div className="flex items-center gap-1">
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => {
+                  setFocusedMode(false);
+                  setShowDocumentViewer(true);
+                }}
+                title="View full document"
+              >
+                <FileText className="h-5 w-5" />
+              </Button>
+              <ThemeToggle />
+            </div>
           </div>
         </header>
 
@@ -125,10 +223,13 @@ export default function Home() {
         </div>
 
         {/* Focused controls - auto-hides */}
-        <div className={cn(
-          "absolute bottom-0 left-0 right-0 z-10 transition-opacity duration-300",
-          controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
-        )}>
+        <div 
+          className={cn(
+            "absolute bottom-0 left-0 right-0 z-10 transition-opacity duration-300",
+            controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+          )}
+          data-no-tap
+        >
           <FocusedControls />
         </div>
 
@@ -172,6 +273,14 @@ export default function Home() {
                 <Button 
                   variant="ghost" 
                   size="icon"
+                  onClick={() => setShowDocumentViewer(true)}
+                  title="View full document"
+                >
+                  <FileText className="h-5 w-5" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
                   onClick={() => setFocusedMode(true)}
                   title="Focused reading mode"
                 >
@@ -197,14 +306,46 @@ export default function Home() {
           <div className={cn('flex-1 space-y-6', showSettings && 'lg:max-w-[calc(100%-320px)]')}>
             {!hasContent ? (
               /* Input mode */
-              <Card>
-                <CardHeader>
-                  <CardTitle>Load Content</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <InputPanel />
-                </CardContent>
-              </Card>
+              <>
+                {/* URL loading state */}
+                {urlLoadState.loading && (
+                  <Card>
+                    <CardContent className="py-8">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                        <p className="text-muted-foreground">Loading content from URL...</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* URL error state */}
+                {urlLoadState.error && (
+                  <Card className="border-destructive">
+                    <CardContent className="py-6">
+                      <div className="flex flex-col items-center gap-4 text-center">
+                        <p className="text-destructive font-medium">Failed to load URL</p>
+                        <p className="text-sm text-muted-foreground">{urlLoadState.error}</p>
+                        <Button variant="outline" onClick={() => setUrlLoadState({ loading: false, error: null })}>
+                          Try Again
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Normal input panel */}
+                {!urlLoadState.loading && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Load Content</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <InputPanel />
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             ) : (
               /* Reading mode */
               <>
@@ -251,7 +392,7 @@ export default function Home() {
             )}
 
             {/* Quick tips */}
-            {!hasContent && (
+            {!hasContent && !urlLoadState.loading && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">How it works</CardTitle>
@@ -269,6 +410,10 @@ export default function Home() {
                   <p>
                     Try the <strong>Word Frequency</strong> algorithm for smarter timing - 
                     common words flash quickly while rare words are shown longer.
+                  </p>
+                  <p>
+                    <strong>Quick tip:</strong> Add <code className="bg-muted px-1 py-0.5 rounded text-xs">?url=</code> to 
+                    share articles directly, e.g. <code className="bg-muted px-1 py-0.5 rounded text-xs break-all">skimreaper.xyz?url=https://example.com/article</code>
                   </p>
                 </CardContent>
               </Card>
@@ -339,6 +484,11 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
+      {/* Document Viewer Overlay */}
+      {showDocumentViewer && (
+        <DocumentViewer onClose={() => setShowDocumentViewer(false)} />
+      )}
     </div>
   );
 }

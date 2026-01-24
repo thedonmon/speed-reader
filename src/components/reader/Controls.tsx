@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Progress } from '@/components/ui/progress';
-import { useReaderStore, type ReaderState } from '@/stores/reader-store';
+import { useReaderStore } from '@/stores/reader-store';
 import { cn } from '@/lib/utils';
 
 interface ControlsProps {
@@ -32,7 +32,6 @@ export function Controls({ className }: ControlsProps) {
     stop,
     next,
     previous,
-    goToSlide,
     setWPM,
     progress,
     totalSlides,

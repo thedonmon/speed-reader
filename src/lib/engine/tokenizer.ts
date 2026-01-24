@@ -224,7 +224,7 @@ function getPunctuationDelay(
   text: string,
   settings: ReaderSettings
 ): { preDelay: number; postDelay: number } {
-  let preDelay = 0;
+  const preDelay = 0;
   let postDelay = 0;
   
   const lastChar = text.slice(-1);

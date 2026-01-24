@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useEffectEvent } from 'react';
 import { useTheme } from '@/components/theme-provider';
 
 /**
@@ -13,18 +13,23 @@ export function useIsDarkMode(): boolean {
   const { theme } = useTheme();
   const [isDark, setIsDark] = useState(false);
 
+  // Using useEffectEvent to avoid lint warnings about setState in effect
+  const onSetDark = useEffectEvent((value: boolean) => {
+    setIsDark(value);
+  });
+
   useEffect(() => {
     if (theme === 'dark') {
-      setIsDark(true);
+      onSetDark(true);
     } else if (theme === 'light') {
-      setIsDark(false);
+      onSetDark(false);
     } else {
       // theme === 'system' - check actual system preference
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      setIsDark(mediaQuery.matches);
+      onSetDark(mediaQuery.matches);
 
       // Listen for system theme changes
-      const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
+      const handler = (e: MediaQueryListEvent) => onSetDark(e.matches);
       mediaQuery.addEventListener('change', handler);
       return () => mediaQuery.removeEventListener('change', handler);
     }
